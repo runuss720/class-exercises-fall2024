@@ -13,6 +13,22 @@ import {
 } from "antd";
 
 export default function CourseSearchForm({ fetchCourses }) {
+    const [departments, setDepartments] = useState([]);
+
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await fetch("/api/departments");
+                const data = await response.json();
+                setDepartments(data);
+            } catch (error) {
+                console.error("Failed to fetch departments:", error);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
+
     const classificationOpts = [
         { key: "fys", value: "First Year Seminar" },
         { key: "di", value: "Diversity Intensive" },

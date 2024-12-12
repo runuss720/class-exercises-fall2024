@@ -2,8 +2,17 @@ const rootURL = "http://localhost:8000";
 
 // React Task 1:
 export async function fetchUser(username) {
-    // replace this code with functionality that actually
-    // queries that correct endpoint:
+    /*try {
+        const response = await fetch(`/api/users/${username}`);
+        if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+        }
+        const user = await response.json();
+        return user;
+    } catch (error) {
+        console.error("Failed to fetch user:", error);
+        return null;
+    }*/
     return {
         id: 18,
         username: "svanwart",

@@ -4,7 +4,7 @@ from sqlalchemy import select  # , or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from db import AsyncSessionLocal
-from models import Course, Schedule
+from models import Course, Schedule, User
 
 """
 Documentation:
@@ -63,6 +63,37 @@ async def show_courses_with_table_joins(db: AsyncSessionLocal):
         print("-" * 70)
 
 
+# prints all of the usernames in the system (query the User model).
+async def print_usernames(db: AsyncSessionLocal):
+    query = select(User.username)
+    result = await db.execute(query)
+
+    usernames = result.scalars().all()
+    for username in usernames:
+        print(username)
+
+
+# prints a distinct list of departments (query the Course model).
+async def print_unique_departments(db: AsyncSessionLocal):
+    query = select(Course.department).distinct()
+    result = await db.execute(query)
+
+    departments = result.scalars().all()
+    for department in departments:
+        print(department)
+
+
+async def print_open_cs_courses(db: AsyncSessionLocal):
+    query = select(Course.crn, Course.title).where(
+        Course.department == "CSCI", Course.enrollment_current < Course.enrollment_max
+    )
+    result = await db.execute(query)
+    open_courses = result.all()
+
+    for course in open_courses:
+        print(f"CRN: {course.crn}, Title: {course.title}")
+
+
 async def print_schedules(db: AsyncSessionLocal):
     # Fetch the courses from the DB:
     query = select(Schedule).options(
@@ -99,9 +130,10 @@ async def main():
     db = AsyncSessionLocal()
 
     # async function invocations go here:
-    await show_courses(db)
-    await show_courses_with_table_joins(db)
-    await print_schedules(db)
+    # await show_courses(db)
+    # await show_courses_with_table_joins(db)
+    # await print_schedules(db)
+    await print_open_cs_courses(db)
 
     await db.close()
 
