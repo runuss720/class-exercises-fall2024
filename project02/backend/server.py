@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -16,9 +17,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*"
-    ],  # Allows all origins. Specify domains for more control.
+    allow_origins=["*"],  # Allows all origins. Specify domains for more control.
     allow_credentials=True,  # Allows cookies to be included in requests
     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allows all headers
@@ -35,18 +34,33 @@ async def startup():
 # Task 1
 @app.get("/api/departments/", response_model=List[str])
 async def get_department_codes(db: AsyncSession = Depends(get_db)):
-    # replace with your code...
-    return []
+    result = await db.execute(select(models.Course.department).distinct())
+    department_codes = [row[0] for row in result.fetchall()]
+    return department_codes
+
+
+class User(BaseModel):
+    id: int
+    username: str
+    email: str
+    first_name: str
+    last_name: str
+
+    class Config:
+        orm_mode = True
 
 
 # Task 2
-# Note: replace response_model=object with response_model=User once you've got this working
-@app.get("/api/users/{username}", response_model=object)
-async def get_users_by_username(
-    username: str, db: AsyncSession = Depends(get_db)
-):
-    # replace with your code...
-    return {}
+# Note: replace response_model=object with response_model=User once you've got this working # noqa
+@app.get("/api/users/{username}", response_model=serializers.User)  # noqa
+async def get_users_by_username(username: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(models.User).filter(models.User.username == username)
+    )
+    user = result.scalars().first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 # Task 3
@@ -56,6 +70,11 @@ async def get_courses(
     instructor: str = Query(None),
     department: str = Query(None),
     hours: int = Query(None),
+    diversity_intensive: bool = Query(None),
+    diversity_intensive_r: bool = Query(None),
+    first_year_seminar: bool = Query(None),
+    honors: bool = Query(None),
+    show_open_only: bool = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
 
@@ -77,6 +96,23 @@ async def get_courses(
     # includes an "hours" filter if specified:
     if hours:
         query = query.where(models.Course.hours == hours)
+
+    if diversity_intensive:
+        query = query.where(models.Course.diversity_intensive == diversity_intensive)
+
+    if diversity_intensive_r:
+        query = query.where(
+            models.Course.diversity_intensive_r == diversity_intensive_r
+        )
+
+    if honors:
+        query = query.where(models.Course.honors == honors)
+
+    if first_year_seminar:
+        query = query.where(models.Course.first_year_seminar == first_year_seminar)
+
+    if show_open_only:
+        query = query.where(models.Course.open == show_open_only)
 
     # includes an "instructors" filter if specified:
     if instructor:
@@ -146,9 +182,7 @@ async def get_instructors(db: AsyncSession = Depends(get_db)):
 @app.get("/api/users/", response_model=List[serializers.User])
 async def get_users(db: AsyncSession = Depends(get_db)):
 
-    result = await db.execute(
-        select(models.User).order_by(models.User.username)
-    )
+    result = await db.execute(select(models.User).order_by(models.User.username))
     users = result.scalars().all()  # Extract distinct department names
     return users
 
@@ -194,9 +228,7 @@ async def read_schedule(db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/api/schedules/{username}", response_model=serializers.Schedule)
-async def read_schedule_by_username(
-    username: str, db: AsyncSession = Depends(get_db)
-):
+async def read_schedule_by_username(username: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.Schedule)
         .join(models.Schedule.user)  # Join the related User table
@@ -215,9 +247,7 @@ async def read_schedule_by_username(
     return schedule
 
 
-@app.post(
-    "/api/schedules/{schedule_id}/courses", response_model=serializers.Schedule
-)
+@app.post("/api/schedules/{schedule_id}/courses", response_model=serializers.Schedule)
 async def add_course_to_schedule(
     schedule_id: int,
     course_data: serializers.SchedulCourseCreate,
@@ -249,9 +279,7 @@ async def add_course_to_schedule(
     )
     existing_schedule_course = schedule_course_result.scalar_one_or_none()
     if existing_schedule_course:
-        raise HTTPException(
-            status_code=400, detail="Course already in schedule"
-        )
+        raise HTTPException(status_code=400, detail="Course already in schedule")
 
     # Create new ScheduleCourse entry
     new_schedule_course = models.ScheduleCourse(
